@@ -41,6 +41,11 @@ const BeatmapName = styled.span`
   text-underline-offset: 6px;
   transition: opacity 0.3s, transform 0.5s;
   white-space: nowrap;
+
+  @media screen and (max-width: 750px) {
+    text-decoration-thickness: 1px;
+    text-underline-offset: 5px;
+  }
 `
 
 export default function BeatmapSelector({ onBeatmapSelect }) {
@@ -88,13 +93,14 @@ export default function BeatmapSelector({ onBeatmapSelect }) {
 
       // Then pass it up to the state in the form
       onBeatmapSelect({
+        osuFilename: beatmapResult.OsuFile,
         beatmapId: beatmapResult.BeatmapId,
         setId: beatmapResult.ParentSetId,
         maxCombo: beatmapResult.MaxCombo,
         ar: beatmapResult.AR
       })
     } catch (e) {
-      alert('error fetching beatmap')
+      alert('There was an error fetching this beatmap from Chimu.')
       setSelectedBeatmap('')
       onBeatmapSelect({})
     }

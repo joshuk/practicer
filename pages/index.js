@@ -12,7 +12,7 @@ const Contianer = styled.div`
   height: 100%;
   margin: 0 auto;
   padding: 0 16px;
-  align-content: center;
+  align-items: center;
   font-family: ${font.style.fontFamily}, sans-serif;
   flex-wrap: wrap;
 `

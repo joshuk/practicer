@@ -30,14 +30,25 @@ const Input = styled.input`
 
   @media screen and (max-width: 750px) {
     text-decoration-thickness: 1px;
+    text-underline-offset: 5px;
   }
 `
 
-export default function BaseInput({ inputMode, placeholder, defaultValue, dynamicWidth, pattern, onInputChange }) {
+export default function BaseInput({ inputMode, placeholder, defaultValue, dynamicWidth, pattern, allowDecimals, onInputChange }) {
   const inputRef = useRef()
 
   const isInputValid = (e) => {
-    if (inputMode !== 'numeric' || /[0-9.]/.test(e.key)) {
+    // Don't validate non-numeric inputs
+    if (inputMode !== 'numeric') {
+      return
+    }
+
+    const newValue = e.target.value + e.key
+    const isKeyNumeric = new RegExp(`[0-9${allowDecimals ? '.' : ''}]`).test(e.key)
+    const isDecimalValid = (!allowDecimals || /^[^.]*[.]?[^.]*$/.test(newValue))
+    const isPatternValid = (!pattern || new RegExp(pattern).test(newValue))
+
+    if (isKeyNumeric && isDecimalValid && isPatternValid) {
       return
     }
 
@@ -71,7 +82,7 @@ export default function BaseInput({ inputMode, placeholder, defaultValue, dynami
 
     // Then reset it when the fonts load
     document.fonts.ready.then(setElementWidth)
-  }, [])
+  }, [defaultValue])
 
   return (
     <Input
