@@ -66,7 +66,8 @@ export default function BeatmapSelector({ onBeatmapSelect }) {
 
     // If it's not an osu beatmap, don't do anything
     if (beatmapRegexResult[1] !== 'osu') {
-      console.log('not osu')
+      alert('Practicer only support osu!standard maps currently. Sorry!')
+
       setSelectedBeatmap('')
       onBeatmapSelect({})
 
@@ -110,7 +111,7 @@ export default function BeatmapSelector({ onBeatmapSelect }) {
     <Container>
       <BaseInput
         placeholder="https://osu.ppy.sh/beatmapsets/874#osu/6097"
-        pattern="https:\/\/osu\.ppy\.sh\/beatmapsets\/\d+#(?:osu|mania|fruits|taiko)\/\d+"
+        pattern="https:\/\/osu\.ppy\.sh\/beatmapsets\/\d+#osu\/\d+"
         onInputChange={onBeatmapUpdate}/>
 
       <BeatmapName>{selectedBeatmap}</BeatmapName>

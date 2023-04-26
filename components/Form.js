@@ -6,6 +6,7 @@ import BaseSelect from './base/BaseSelect'
 import BaseInput from './base/BaseInput'
 import BeatmapSelector from './BeatmapSelector'
 import DiffSetList from './DiffSetList'
+import useBeatmapGenerator from '../hooks/useBeatmapGenerator'
 
 const Container = styled.main`
   width: 100%;
@@ -15,7 +16,7 @@ const Container = styled.main`
 const Line = styled.p`
   width: 100%;
   font-size: 32px;
-  line-height: 1.4;
+  line-height: 1.3;
 
   :not(:last-child) {
     margin-bottom: 16px;
@@ -52,8 +53,13 @@ const Underline = styled.span`
   }
 `
 
-const CreateButton = styled.button`
+const ButtonContainer = styled.div`
+  position: relative;
+  display: inline-block;
   margin-top: 32px;
+`
+
+const CreateButton = styled.button`
   padding: 16px 24px;
   background: rgb(var(--blue-light));
   border: none;
@@ -63,11 +69,45 @@ const CreateButton = styled.button`
   font-family: inherit;
 `
 
+const ErrorBubble = styled.div`
+  position: absolute;
+  top: 50%;
+  right: 0;
+  width: max-content;
+  padding: 12px 18px;
+  background: rgb(var(--red));
+  color: rgb(var(--blue-dark));
+  font-weight: 500;
+  transform: translate(calc(100% + 16px), -50%);
+  transition: transform 0.3s, opacity 0.3s;
+
+  :before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 0;
+    display: block;
+    border: 8px solid transparent;
+    border-right-color: rgb(var(--red));
+    transform: translate(-100%, -50%);
+  }
+
+  :empty,
+  &.hidden {
+    transform: translate(calc(100% + 8px), -50%);
+    opacity: 0;
+  }
+`
+
 export default function Form() {
   // Get a ref for the form
   const paramsRef = useRef()
 
-  // And the beatmap
+  // Then create a state object for any errors
+  const [error, setError] = useState('')
+  const errorRef = useRef()
+
+  // And one for the beatmap
   const [beatmap, setBeatmap] = useState()
 
   // Now watch for when the beatmap changes so we can animate the form
@@ -126,6 +166,64 @@ export default function Form() {
   const [incrementer, setIncrementer] = useState(incrementerOptions[0].value)
   const [incrementerVolume, setIncrementerVolume] = useState(10)
 
+  // Now import the functions from useBeatmapGenerator
+  const { getBeatmapBlobUrl } = useBeatmapGenerator()
+
+  // Then set up the function when the Create button is clicked
+  const validateForm = () => {
+    // Check a beatmap is set
+    if (!beatmap.setId) {
+      setError('There is no beatmap set')
+
+      return
+    }
+
+    // That the combo increment isn't too low
+    if (Number(comboIncrement) < 10) {
+      setError('The minimum combo increment is 10')
+
+      return
+    }
+
+    // Or too high
+    if (Number(comboIncrement) > beatmap.maxCombo) {
+      setError('The combo increment is greater than the beatmap\'s max combo.')
+
+      return
+    }
+
+    // Check that all the ARs are valid, then remove any duplicates
+    const processedSets = []
+
+    for (const set of diffSets) {
+      if (set.ar > 10) {
+        setError('The maximum AR for a difficulty is 10.')
+
+        return
+      }
+
+      // Find any duplicate objects in the array
+      const duplicateDiffSet = processedSets.find((processedSet) => {
+        return JSON.stringify(processedSet) === JSON.stringify(set)
+      })
+
+      // If there isn't one, then we can add it to the processedSets list
+      if (!duplicateDiffSet) {
+        processedSets.push(set)
+      }
+    }
+
+    // Let's hide the error here
+    errorRef.current.classList.add('hidden')
+    setTimeout(() => {
+      setError('')
+      errorRef.current.classList.remove('hidden')
+    }, 300)
+
+    // Awesome, now we're ready to create the difficulties
+    getBeatmapBlobUrl(beatmap, processedSets)
+  }
+
   return (
     <Container>
       <BeatmapSelectionLine>
@@ -158,7 +256,11 @@ export default function Form() {
           % volume to get the starting combo.
         </Line>
 
-        <CreateButton>Create</CreateButton>
+        <ButtonContainer>
+          <CreateButton onClick={validateForm}>Create</CreateButton>
+
+          <ErrorBubble ref={errorRef}>{error}</ErrorBubble>
+        </ButtonContainer>
       </div>
     </Container>
   )

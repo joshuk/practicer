@@ -17,6 +17,7 @@ const ListItem = styled.li`
   margin-left: 12px;
   padding-left: 21px;
   font-size: 24px;
+  line-height: 1.3;
 
   input,
   select {
@@ -26,7 +27,7 @@ const ListItem = styled.li`
   :before {
     content: '';
     position: absolute;
-    top: 12px;
+    top: 13px;
     left: 0;
     display: block;
     width: 6px;
@@ -82,11 +83,20 @@ export default function DiffSetList({ beatmap, onDiffsChange }) {
       value: 0
     }
   ]
+  const untilOptions = [
+    {
+      value: 'end of the map'
+    },
+    {
+      value: 'next diff'
+    }
+  ]
   const defaultSetsList = [
     {
       id: 0,
-      ar: null,
-      startingCombo: 200
+      ar: 3,
+      startingCombo: startingComboOptions[0].value,
+      until: untilOptions[0].value
     }
   ]
   const [setsList, setSetsList] = useState(defaultSetsList)
@@ -104,7 +114,7 @@ export default function DiffSetList({ beatmap, onDiffsChange }) {
     setSetsList(defaultSetsList)
   }, [beatmap])
 
-  // Whenever the setsList changes, push it up to the form
+  // Whenever the setsList changes
   useEffect(() => {
     // If we've added a new item, animate it in
     if (deferredSetsList.length < setsList.length) {
@@ -123,13 +133,20 @@ export default function DiffSetList({ beatmap, onDiffsChange }) {
       })
     }
 
-    onDiffsChange(setsList)
+    // Now we wanna push the diffs up to the form without the id
+    const setsClone = getDeepClone(setsList)
+
+    setsClone.forEach((set) => {
+      delete set.id
+    })
+
+    onDiffsChange(setsClone)
   }, [setsList])
 
   const updateSetParams = (index, param, value) => {
     const setsClone = getDeepClone(setsList)
 
-    setsClone[index][param] = Number(value)
+    setsClone[index][param] = param !== 'until' ? Number(value) : value
 
     setSetsList(setsClone)
   }
@@ -140,7 +157,8 @@ export default function DiffSetList({ beatmap, onDiffsChange }) {
       {
         id: setsList[setsList.length - 1].id + 1,
         ar: beatmap.ar,
-        startingCombo: 200
+        startingCombo: startingComboOptions[0].value,
+        until: untilOptions[0].value
       }
     ]
 
@@ -175,15 +193,19 @@ export default function DiffSetList({ beatmap, onDiffsChange }) {
           return (
             <ListItem key={item.id}>
               <ListItemInner>
-                One set with AR&nbsp;
+                One that's AR&nbsp;
                 <BaseInput
                   inputMode="numeric"
                   defaultValue={item.ar}
                   dynamicWidth={true}
+                  allowDecimals={true}
                   pattern="^[0-9]{1,2}(?:\.[0-9]?)?$"
-                  onInputChange={(value) => { updateSetParams(index, 'ar', value) }} />&nbsp;and
-                a starting combo of&nbsp;
-                <BaseSelect options={startingComboOptions} onOptionChange={(value) => { updateSetParams(index, 'startingCombo', value) }} />
+                  onInputChange={(value) => { updateSetParams(index, 'ar', value) }} />,
+                has a starting combo of&nbsp;
+                <BaseSelect options={startingComboOptions} onOptionChange={(value) => { updateSetParams(index, 'startingCombo', value) }} />,
+                and lasts until the&nbsp;
+                <BaseSelect options={untilOptions} onOptionChange={(value) => { console.log(value); updateSetParams(index, 'until', value) }} />
+
                 {
                   index !== 0 ?
                   <RemoveButton onClick={() => { removeSet(index) }}>
