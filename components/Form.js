@@ -67,6 +67,11 @@ const CreateButton = styled.button`
   cursor: pointer;
   font-size: 24px;
   font-family: inherit;
+  transition: background-color 0.3s;
+
+  &[disabled] {
+    background: rgb(var(--blue-light), 0.5);
+  }
 `
 
 const ErrorBubble = styled.div`
@@ -167,7 +172,7 @@ export default function Form() {
   const [incrementerVolume, setIncrementerVolume] = useState(10)
 
   // Now import the functions from useBeatmapGenerator
-  const { getBeatmapBlobUrl } = useBeatmapGenerator()
+  const { isBeatmapGenerating, beatmapGenerationStatus, getBeatmapBlobUrl } = useBeatmapGenerator()
 
   // Then set up the function when the Create button is clicked
   const validateForm = () => {
@@ -220,8 +225,14 @@ export default function Form() {
       errorRef.current.classList.remove('hidden')
     }, 300)
 
+    const diffSetParams = {
+      comboIncrement,
+      incrementer,
+      incrementerVolume
+    }
+
     // Awesome, now we're ready to create the difficulties
-    getBeatmapBlobUrl(beatmap, processedSets)
+    getBeatmapBlobUrl(beatmap, diffSetParams, processedSets)
   }
 
   return (
@@ -257,7 +268,8 @@ export default function Form() {
         </Line>
 
         <ButtonContainer>
-          <CreateButton onClick={validateForm}>Create</CreateButton>
+          {/* disabled={isBeatmapGenerating} */}
+          <CreateButton onClick={validateForm}>{beatmapGenerationStatus ? `${beatmapGenerationStatus}...` : 'Create'}</CreateButton>
 
           <ErrorBubble ref={errorRef}>{error}</ErrorBubble>
         </ButtonContainer>
