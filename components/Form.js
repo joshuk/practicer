@@ -281,8 +281,7 @@ export default function Form() {
         </Line>
 
         <ButtonContainer>
-          {/* disabled={isBeatmapGenerating} */}
-          <CreateButton onClick={validateForm}>{beatmapGenerationStatus ? `${beatmapGenerationStatus}...` : 'Create'}</CreateButton>
+          <CreateButton disabled={isBeatmapGenerating} onClick={validateForm}>{beatmapGenerationStatus ? `${beatmapGenerationStatus}...` : 'Create'}</CreateButton>
 
           <ErrorBubble ref={errorRef}>{error}</ErrorBubble>
         </ButtonContainer>

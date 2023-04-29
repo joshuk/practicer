@@ -35,7 +35,7 @@ export default function useBeatmapGenerator() {
 
   const getDifficultyObjectFromString = (difficulty) => {
     const sections = {
-      header: difficulty.match(/osu file format v\d*/)[0]
+      // header: difficulty.match(/osu file format v\d*/)[0]
     }
 
     // First we need to split everything up so we can use it
@@ -280,10 +280,8 @@ export default function useBeatmapGenerator() {
     difficultyObject = getDeepClone(difficultyObject)
 
     // Let's start by setting the version
-    let difficulty = `${difficultyObject.header}\n`
-
-    // Then we can delete the version, since we don't need it
-    delete difficultyObject.header
+    // We're going to always set this to v14, since older versions don't support decimal ARs
+    let difficulty = `osu file format v14\n`
 
     // Now we can loop through the keys of the hitObjects, since they denote the sections
     for (const [header, values] of Object.entries(difficultyObject)) {
@@ -334,6 +332,11 @@ export default function useBeatmapGenerator() {
   const getDownloadableBeatmap = async (beatmap, { comboIncrement, incrementer, incrementerVolume }, diffSets) => {
     // Set the initial states for the UI
     setIsBeatmapGenerating(true)
+
+    // Sleep for 500ms so the UI can catch up
+    await new Promise(r => setTimeout(r, 500))
+
+    // Now set the beatmapGenerationStatus
     setBeatmapGenerationStatus('Fetching')
 
     // Fetch the .osz file from the API
