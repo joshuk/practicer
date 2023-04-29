@@ -326,7 +326,12 @@ export default function useBeatmapGenerator() {
     return difficulty
   }
 
-  const getBeatmapBlobUrl = async (beatmap, { comboIncrement, incrementer, incrementerVolume }, diffSets) => {
+  const getFilenameFromString = (string) => {
+    // Filenames don't allow certain special characters in them, so we're just gonna strip them out
+    return string.replace(/[<>:"\/\\|?*]/g, '')
+  }
+
+  const getDownloadableBeatmap = async (beatmap, { comboIncrement, incrementer, incrementerVolume }, diffSets) => {
     // Set the initial states for the UI
     setIsBeatmapGenerating(true)
     setBeatmapGenerationStatus('Fetching')
@@ -347,7 +352,7 @@ export default function useBeatmapGenerator() {
     setBeatmapGenerationStatus('Creating')
 
     // Then get the current difficulty from the osz file
-    const difficulty = beatmapFile.files[beatmap.osuFilename]
+    const difficulty = beatmapFile.files[getFilenameFromString(beatmap.osuFilename)]
     const difficultyContents = await difficulty.async('string')
 
     // And parse it into an object
@@ -398,12 +403,8 @@ export default function useBeatmapGenerator() {
         const newDifficultyFile = getDifficultyStringFromObject(parsedDifficulty, incrementerObjects.concat(sectionHitObjects))
 
         // Right, now just to add it to the zip file
-        // Figure out the filename (we can just remove any special characters from the newDiffName)
-        const fileName = beatmap.osuFilename.replace(/\[.*\]/, `[${newDiffName.replace(/[^\w]/g, '')}]`)
-
-        console.log(sectionStartCombo, sectionEndCombo)
-        console.log(newDiffName)
-        console.log(fileName)
+        // First off figure out the filename
+        const fileName = getFilenameFromString(beatmap.osuFilename.replace(/\[.*\]/, `[${newDiffName.replace(/[^\w]/g, '')}]`))
 
         // Then chuck it in the file
         beatmapFile.file(fileName, newDifficultyFile)
@@ -413,17 +414,23 @@ export default function useBeatmapGenerator() {
     // We've gone through the set, added the files, now we can just generate the beatmap file's blob
     const blob = await beatmapFile.generateAsync({ type:'blob' })
 
+    // And the osz filename
+    const oszFilename = `Practicer - ${beatmap.setId} ${getFilenameFromString(beatmap.osuFilename.replace(/ (?:\([^(]*\) )?\[.*\].osu$/, ''))}.osz`
+
     // Update the state
     setIsBeatmapGenerating(false)
     setBeatmapGenerationStatus('')
 
     // And return the file
-    return blob
+    return {
+      blob,
+      filename: oszFilename
+    }
   }
 
   return {
     isBeatmapGenerating,
     beatmapGenerationStatus,
-    getBeatmapBlobUrl
+    getDownloadableBeatmap
   }
 }

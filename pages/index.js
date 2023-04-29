@@ -1,5 +1,6 @@
 import styled from 'styled-components'
 import { Work_Sans } from 'next/font/google'
+import Head from 'next/head'
 
 import Form from '../components/Form'
 
@@ -19,8 +20,13 @@ const Contianer = styled.div`
 
 export default function Home() {
   return (
-    <Contianer>
-      <Form />
-    </Contianer>
+    <>
+      <Head>
+        <title>Practicer - Easily create osu! practice difficulties</title>
+      </Head>
+      <Contianer>
+        <Form />
+      </Contianer>
+    </>
   )
 }
