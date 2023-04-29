@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useRef, useEffect } from 'react'
 import styled from 'styled-components'
 
 import getTextWidth from '../../helpers/getTextWidth'
@@ -42,6 +42,15 @@ export default function BaseSelect({ options, onOptionChange }) {
     // Then call the event
     onOptionChange(value)
   }
+
+  // When the component mounts, set the input width
+  useEffect(() => {
+    // Set the width initially
+    setElementWidth()
+
+    // Then reset it when the fonts load
+    document.fonts.ready.then(setElementWidth)
+  }, [])
 
   return (
     <Select ref={dropdownRef} onChange={setElementWidth}>

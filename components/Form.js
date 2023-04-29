@@ -175,7 +175,7 @@ export default function Form() {
   const { isBeatmapGenerating, beatmapGenerationStatus, getBeatmapBlobUrl } = useBeatmapGenerator()
 
   // Then set up the function when the Create button is clicked
-  const validateForm = () => {
+  const validateForm = async () => {
     // Check a beatmap is set
     if (!beatmap.setId) {
       setError('There is no beatmap set')
@@ -232,7 +232,20 @@ export default function Form() {
     }
 
     // Awesome, now we're ready to create the difficulties
-    getBeatmapBlobUrl(beatmap, diffSetParams, processedSets)
+    const beatmapBlob = await getBeatmapBlobUrl(beatmap, diffSetParams, processedSets)
+
+    // Now we've go the difficulties, we can create an invisible link to download it
+    const downloadElement = document.createElement('a')
+    downloadElement.style.display = 'none'
+    downloadElement.setAttribute('href', URL.createObjectURL(beatmapBlob))
+    // TODO - Update this filename so it goes in the same folder as when you download from the osu website
+    downloadElement.setAttribute('download', `Practicer-${beatmap.setId}.osz`)
+
+    // Add it to the child
+    document.body.appendChild(downloadElement)
+
+    // And click it
+    downloadElement.click()
   }
 
   return (

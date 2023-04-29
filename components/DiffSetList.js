@@ -85,10 +85,10 @@ export default function DiffSetList({ beatmap, onDiffsChange }) {
   ]
   const untilOptions = [
     {
-      value: 'end of the map'
+      value: 'next diff'
     },
     {
-      value: 'next diff'
+      value: 'end of the map'
     }
   ]
   const defaultSetsList = [
@@ -204,7 +204,7 @@ export default function DiffSetList({ beatmap, onDiffsChange }) {
                 has a starting combo of&nbsp;
                 <BaseSelect options={startingComboOptions} onOptionChange={(value) => { updateSetParams(index, 'startingCombo', value) }} />,
                 and lasts until the&nbsp;
-                <BaseSelect options={untilOptions} onOptionChange={(value) => { console.log(value); updateSetParams(index, 'until', value) }} />
+                <BaseSelect options={untilOptions} onOptionChange={(value) => { updateSetParams(index, 'until', value) }} />
 
                 {
                   index !== 0 ?

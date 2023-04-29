@@ -1,6 +1,8 @@
 import JSZip from 'jszip'
 import { useState } from 'react'
 
+import getDeepClone from '../helpers/getDeepClone'
+
 export default function useBeatmapGenerator() {
   const [isBeatmapGenerating, setIsBeatmapGenerating] = useState(false)
   const [beatmapGenerationStatus, setBeatmapGenerationStatus] = useState('')
@@ -210,6 +212,13 @@ export default function useBeatmapGenerator() {
                 stringValue: line
               })
             break
+            default:
+              // I don't need to format anything else properly right now, so just add it to the output
+              // with a stringValue so it can be rebuilt
+              output.push({
+                stringValue: line
+              })
+            break
           }
         })
 
@@ -221,7 +230,103 @@ export default function useBeatmapGenerator() {
     return sections
   }
 
-  const getBeatmapBlobUrl = async (beatmap, diffSetParams, diffSets) => {
+  const getHitObjectsBetweenCombo = (hitObjects, startCombo, endCombo) => {
+    const newHitObjects = hitObjects.filter((object) => {
+      // We wanna fetch all objects that have a starting combo between the ones
+      // specified. This means that if the endCombo falls inside a slider it'll
+      // still be picked up.
+      return object.startCombo >= startCombo && object.startCombo <= endCombo
+    })
+
+    return newHitObjects
+  }
+
+  const getComboIncrementerObjects = (incrementerType, incrementAmount, incrementVolume, firstHitObject) => {
+    if (incrementAmount === 0) {
+      return []
+    }
+
+    let output = null
+    const incrementerTime = firstHitObject.time - 2000
+    const incrementerHitsounds = `0:0:${incrementVolume}:0:`
+
+    switch (incrementerType) {
+      case 'spinners':
+        // We're gonna basically make x amount of 0 length spinners, which is really easy
+        // Let's just make an array with incrementAmount values, then fill them all with the same thing
+        output = Array(incrementAmount).fill({
+          stringValue: `256,192,${incrementerTime},44,0,${incrementerTime},${incrementerHitsounds}`
+        })
+      break
+      case 'a slider':
+        // Destructure this to make it a bit cleaner
+        const { xPos, yPos } = firstHitObject
+
+        // We're gonna make a really fast reverse slider that repeats incrementAmount - 1 times
+        // An example syntax is available below
+        // 154,165,55844,6,0,L|206:165,199,3,0:0:0.1:0:
+        output = [{
+          stringValue: `${xPos},${yPos},${incrementerTime},6,0,L|${xPos + 50}:${yPos},${incrementAmount - 1},3,${incrementerHitsounds}`
+        }]
+      break
+    }
+
+    return output
+  }
+
+  const getDifficultyStringFromObject = (difficultyObject, hitObjects) => {
+    // So now we're gonna rebuild the difficulty file from the difficulty object and new
+    // hit objects that we've generated. For safety here, let's make a deep clone
+    difficultyObject = getDeepClone(difficultyObject)
+
+    // Let's start by setting the version
+    let difficulty = `${difficultyObject.header}\n`
+
+    // Then we can delete the version, since we don't need it
+    delete difficultyObject.header
+
+    // Now we can loop through the keys of the hitObjects, since they denote the sections
+    for (const [header, values] of Object.entries(difficultyObject)) {
+      // So let's start by adding some new lines then the header
+      difficulty += `\n${header}\n`
+
+      if (['[Metadata]', '[Difficulty]'].includes(header)) {
+        // If it's either the metadata or the difficulty sections, let's loop through and add
+        // everything from the objects
+        for (const [key, value] of Object.entries(values)) {
+          // Ignore the stringValue keys
+          if (key === 'stringValue') {
+            continue
+          }
+
+          // And just reformat everything a bit
+          difficulty += `${key}:${value}\n`
+        }
+      } else {
+        // Otherwise, we can just add everything in a more generic way
+        // For the items that are stored as an object they'll have a stringValue
+        if (values.stringValue) {
+          // This is an object, so we can just append the stringValue to the difficulty and move on
+          difficulty += `${values.stringValue}\n`
+        } else {
+          // It's an array of values instead, so we need to loop through
+          // Let's first figure out what exactly we're looping through (since we loop through something
+          // different for the hit objects)
+          const loopValues = header === '[HitObjects]' ? hitObjects : values
+        
+          // We can just loop through and add each object's stringValue along with a newLine
+          loopValues.forEach((value) => {
+            difficulty += `${value.stringValue}\n`
+          })
+        }
+      }
+    }
+
+    // Now we should be done, so we can just return it
+    return difficulty
+  }
+
+  const getBeatmapBlobUrl = async (beatmap, { comboIncrement, incrementer, incrementerVolume }, diffSets) => {
     // Set the initial states for the UI
     setIsBeatmapGenerating(true)
     setBeatmapGenerationStatus('Fetching')
@@ -248,23 +353,72 @@ export default function useBeatmapGenerator() {
     // And parse it into an object
     const parsedDifficulty = getDifficultyObjectFromString(difficultyContents)
 
+    // Then get the hitObjects, since that's the main bit we'll be editing
     const hitObjects = parsedDifficulty['[HitObjects]']
 
-    const circles = hitObjects.filter((object) => object.objectType === 'circle')
-    const sliders = hitObjects.filter((object) => object.objectType === 'slider')
-    const spinners = hitObjects.filter((object) => object.objectType === 'spinner')
+    // It should be noted here that even though we pass through the actual max combo in the
+    // beatmap object, we don't necessarily want to use that due to inaccuracies in our 
+    // combo calculation as we may end up missing objects at the end
+    const parsedMaxCombo = hitObjects[hitObjects.length - 1].endCombo
 
-    console.log('combo:', hitObjects[hitObjects.length - 1].endCombo)
-    console.log('expected combo:', beatmap.maxCombo)
+    // Let's also figure out the original difficulty's AR. We can check the Difficulty
+    // section of the file for the ApproachRate. If this isn't set (on older maps) we can grab
+    // the OverallDifficulty instead
+    const originalAr = parsedDifficulty['[Difficulty]'].ApproachRate || parsedDifficulty['[Difficulty]'].OverallDifficulty
 
-    console.log('circles:', circles.length)
-    console.log('sliders:', sliders.length)
-    console.log('spinners:', spinners.length)
+    // And grab the difficulty name
+    const originalDiffName = parsedDifficulty['[Metadata]'].Version
 
-    // So, from here we need to loop through all the diffSets to create what the user wants
-    // for (const set of diffSets) {
-    //   console.log(set)
-    // }
+    // Then just change some variables to numbers if they aren't already
+    incrementerVolume = Number(incrementerVolume)
+    comboIncrement = Number(comboIncrement)
+
+    // Now we have to go through each set, since the combo required may be different
+    for (const set of diffSets) {
+      // From that, we've gonna loop through each combo increment until we get to the end
+      for (let i = 0; i < parsedMaxCombo; i += comboIncrement) {
+        const sectionStartCombo = i
+        // Then determine whether the end of the diff is at the end of the map, or the start
+        // of the next difficulty
+        const sectionEndCombo = set.until === 'end of the map' ? parsedMaxCombo : Math.min(parsedMaxCombo, i + comboIncrement)
+
+        // Now we've got the combo restraints, we can get the hit objects between both of those
+        const sectionHitObjects = getHitObjectsBetweenCombo(hitObjects, sectionStartCombo, sectionEndCombo)
+
+        // Now we can generate the incrementer objects
+        const incrementerObjects = getComboIncrementerObjects(incrementer, set.startingCombo, incrementerVolume, sectionHitObjects[0])
+
+        // Right, now we've sorted that out we can get some things ready for creating the difficulty
+        // Let's start off with the new diff name
+        const newDiffName = `${originalDiffName} (${sectionStartCombo}-${sectionEndCombo}) (${set.startingCombo}x) ${set.ar !== originalAr ? `(AR ${set.ar})` : ''}`
+        parsedDifficulty['[Metadata]'].Version = newDiffName
+        parsedDifficulty['[Difficulty]'].ApproachRate = set.ar
+
+        // Ok sick, now we've got all that we can recalculate the difficulty file
+        const newDifficultyFile = getDifficultyStringFromObject(parsedDifficulty, incrementerObjects.concat(sectionHitObjects))
+
+        // Right, now just to add it to the zip file
+        // Figure out the filename (we can just remove any special characters from the newDiffName)
+        const fileName = beatmap.osuFilename.replace(/\[.*\]/, `[${newDiffName.replace(/[^\w]/g, '')}]`)
+
+        console.log(sectionStartCombo, sectionEndCombo)
+        console.log(newDiffName)
+        console.log(fileName)
+
+        // Then chuck it in the file
+        beatmapFile.file(fileName, newDifficultyFile)
+      }
+    }
+
+    // We've gone through the set, added the files, now we can just generate the beatmap file's blob
+    const blob = await beatmapFile.generateAsync({ type:'blob' })
+
+    // Update the state
+    setIsBeatmapGenerating(false)
+    setBeatmapGenerationStatus('')
+
+    // And return the file
+    return blob
   }
 
   return {
