@@ -15,9 +15,9 @@ const Container = styled.span`
       opacity: 1;
     }
 
-    :focus + span {
-      opacity: 0;
-      transform: translateY(-24px);
+    :not(:focus) + span {
+      opacity: 1;
+      transform: translateY(0);
     }
   }
 
@@ -32,10 +32,12 @@ const BeatmapName = styled(Underline)`
   top: 0;
   left: 0;
   width: 100%;
+  opacity: 0;
   overflow: hidden;
   pointer-events: none;
   text-overflow: ellipsis;
   text-underline-offset: 6px;
+  transform: translateY(-24px);
   transition: opacity 0.3s, transform 0.5s;
   white-space: nowrap;
 `
