@@ -72,6 +72,11 @@ const AddButton = styled(Button)`
 `
 
 export default function DiffSetList({ beatmap, onDiffsChange }) {
+  const arOptions = [...Array(10)].map((value, index) => {
+    return {
+      value: index + 1
+    }
+  })
   const startingComboOptions = [
     {
       value: 200

@@ -34,8 +34,15 @@ export default function useBeatmapGenerator() {
   }
 
   const getDifficultyObjectFromString = (difficulty) => {
+    // Start by capturing the header
+    const header = difficulty.match(/osu file format v(\d*)/)
+
     const sections = {
-      // header: difficulty.match(/osu file format v\d*/)[0]
+      // Set the header as the first value in the object
+      header: {
+        stringValue: header[0],
+        headerVersion: Number(header[1])
+      }
     }
 
     // First we need to split everything up so we can use it
@@ -97,9 +104,10 @@ export default function useBeatmapGenerator() {
               time = Number(timeValue)
               beatLength = Number(beatLength)
               beatsInMeasure = Number(beatsInMeasure)
-              isUninherited = Boolean(Number(isUninherited))
+              // On older .osu versions this may not be set, so just default it to true if so
+              isUninherited = isUninherited ? Boolean(Number(isUninherited)) : true
 
-              // If the point is uninherited (so the beatLength is a multiplier) then we can ignore
+              // If the point isn't uninherited (so the beatLength is a multiplier) then we can ignore
               // anything that's postive. This happens from time to time and it just breaks stuff.
               if (!isUninherited && beatLength > 0) {
                 return
@@ -156,7 +164,18 @@ export default function useBeatmapGenerator() {
                 // To do that we'll first need to get the timing point
                 const currentTimingPoint = getActiveTimingPointAtTime(sections['[TimingPoints]'], time)
                 const sliderMultiplier = sections['[Difficulty]'].SliderMultiplier
-                const sliderTickRate = sections['[Difficulty]'].SliderTickRate
+                let sliderTickRate = sections['[Difficulty]'].SliderTickRate
+
+                // Now let's get the number of repeats
+                const sliderRepeats = Number(repeats)
+
+                // SV worked differently for sliders in beatmaps with a version less than 8.
+                // In these versions the SV would signify the slider's BPM multiplier, which can result in
+                // slightly different combo calculations. This updates the slider's tick rate by the SV,
+                // which makes the calculations much more accurate. Thanks molneya!
+                if (sections.header.headerVersion < 8) {
+                  sliderTickRate *= currentTimingPoint.svMultiplier
+                }
 
                 // To calculate the duration of a slider, we can use this formula from the osu website
                 // length / (SliderMultiplier * 100 * SV) * beatLength
@@ -177,18 +196,15 @@ export default function useBeatmapGenerator() {
                   sliderTicks -= 1
                 }
 
-                // Now let's get the number of repeats
-                const sliderRepeats = Number(repeats)
-
                 // And multiply it by the sliderTicks, since each repeat will include the ticks
                 sliderTicks *= sliderRepeats
 
                 // Now we can add those two together to the combo, and we should be sorted
-                objectCombo += sliderRepeats + sliderTicks
+                objectCombo = sliderRepeats + sliderTicks + 1
 
                 // NOTE: The combo calculation here is't 100% right, it tends to overestimate in some cases.
-                // But I've spent hours fucking about with it now and I'm tired of it. Will maybe come back
-                // in the future and fix it. Idk (probably not).
+                // Luckily, this overestimation means that at worst a diff might be a few combo longer or shorter,
+                // which I don't think matters a massive amount.
               } else if (objectTypeBinary[4] === '1') {
                 // The spinner doesn't have anything fancy right now, so we can just define
                 // the object type and move on
@@ -228,6 +244,18 @@ export default function useBeatmapGenerator() {
     }
     
     return sections
+  }
+
+  const getNewComboCombos = (hitObjects) => {
+    const combos = []
+
+    hitObjects.forEach((object) => {
+      if (object.isNewCombo) {
+        combos.push(object.startCombo)
+      }
+    })
+
+    return combos
   }
 
   const getHitObjectsBetweenCombo = (hitObjects, startCombo, endCombo) => {
@@ -279,9 +307,11 @@ export default function useBeatmapGenerator() {
     // hit objects that we've generated. For safety here, let's make a deep clone
     difficultyObject = getDeepClone(difficultyObject)
 
-    // Let's start by setting the version
-    // We're going to always set this to v14, since older versions don't support decimal ARs
-    let difficulty = `osu file format v14\n`
+    // Let's start by setting the version to what it was in the actual map
+    let difficulty = `${difficultyObject.header.stringValue}\n`
+
+    // Then remove it from the object so it doesn't get added again
+    delete difficultyObject.header
 
     // Now we can loop through the keys of the hitObjects, since they denote the sections
     for (const [header, values] of Object.entries(difficultyObject)) {
@@ -379,22 +409,54 @@ export default function useBeatmapGenerator() {
 
     // Then just change some variables to numbers if they aren't already
     incrementerVolume = Number(incrementerVolume)
-    comboIncrement = Number(comboIncrement)
 
     // Now we have to go through each set, since the combo required may be different
     for (const set of diffSets) {
+      let comboSets = []
+
+      // Let's start by creating an array of all the indexes that we're generating between
+      if (comboIncrement === 'new') {
+        // We're generating between each new combo
+        comboSets = getNewComboCombos(hitObjects)
+      } else {
+        // We're genearing between sets of different combos
+        comboSets = [...Array(Math.ceil(parsedMaxCombo / comboIncrement))].map((value, index) => {
+          return Math.min(comboIncrement * index, parsedMaxCombo)
+        })
+      }
+
       // From that, we've gonna loop through each combo increment until we get to the end
-      for (let i = 0; i < parsedMaxCombo; i += comboIncrement) {
-        const sectionStartCombo = i
-        // Then determine whether the end of the diff is at the end of the map, or the start
-        // of the next difficulty
-        const sectionEndCombo = set.until === 'end of the map' ? parsedMaxCombo : Math.min(parsedMaxCombo, i + comboIncrement)
+      for (let index in comboSets) {
+        // Reset the index as a number
+        index = Number(index)
+
+        const sectionStartCombo = comboSets[index]
+        // If we're on the last item in the comboSets array, then use the max combo
+        let sectionEndCombo = index === comboSets.length - 1 ? parsedMaxCombo : comboSets[index + 1]
+
+        // Then determine whether the end of the diff is at the end of the map
+        if (set.until === 'end of the map') {
+          sectionEndCombo === parsedMaxCombo
+        }
 
         // Now we've got the combo restraints, we can get the hit objects between both of those
         const sectionHitObjects = getHitObjectsBetweenCombo(hitObjects, sectionStartCombo, sectionEndCombo)
 
         // Now we can generate the incrementer objects
         const incrementerObjects = getComboIncrementerObjects(incrementer, set.startingCombo, incrementerVolume, sectionHitObjects[0])
+
+        // Variable ARs are only supported by osu file format versions > 12, but versions < 8 have
+        // differences in the way that SV are treated. This means that for any maps less than v8, we
+        // will have to floor the AR. However, for versions over that, we can set the beatmap version
+        // to 13 and (hopefully) nothing should happen
+        if (parsedDifficulty.header.headerVersion < 8) {
+          set.ar = Math.floor(set.ar)
+        } else if (parsedDifficulty.header.headerVersion < 13) {
+          parsedDifficulty.header = {
+            stringValue: 'osu file format v13',
+            headerVersion: 13
+          }
+        }
 
         // Right, now we've sorted that out we can get some things ready for creating the difficulty
         // Let's start off with the new diff name
@@ -415,7 +477,7 @@ export default function useBeatmapGenerator() {
     }
 
     // We've gone through the set, added the files, now we can just generate the beatmap file's blob
-    const blob = await beatmapFile.generateAsync({ type:'blob' })
+    const blob = await beatmapFile.generateAsync({ type: 'blob', mimeType: 'application/x-osu-archive' })
 
     // And the osz filename
     const oszFilename = `Practicer - ${beatmap.setId} ${getFilenameFromString(beatmap.osuFilename.replace(/ (?:\([^(]*\) )?\[.*\].osu$/, ''))}.osz`
@@ -433,7 +495,9 @@ export default function useBeatmapGenerator() {
 
   return {
     isBeatmapGenerating,
+    setIsBeatmapGenerating,
     beatmapGenerationStatus,
+    setBeatmapGenerationStatus,
     getDownloadableBeatmap
   }
 }

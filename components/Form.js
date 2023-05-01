@@ -6,6 +6,7 @@ import BaseSelect from './base/BaseSelect'
 import BaseInput from './base/BaseInput'
 import BeatmapSelector from './BeatmapSelector'
 import DiffSetList from './DiffSetList'
+import Underline from './styles/Underline'
 import useBeatmapGenerator from '../hooks/useBeatmapGenerator'
 
 const Container = styled.main`
@@ -37,19 +38,6 @@ const BeatmapSelectionLine = styled(Line)`
       width: 100%;
       flex: unset;
     }
-  }
-`
-
-const Underline = styled.span`
-  text-decoration: underline;
-  text-decoration-style: dashed;
-  text-decoration-color: rgb(var(--red));
-  text-decoration-thickness: 2px;
-  text-underline-offset: 6px;
-
-  @media screen and (max-width: 750px) {
-    text-decoration-thickness: 1px;
-    text-underline-offset: 5px;
   }
 `
 
@@ -172,13 +160,25 @@ export default function Form() {
   const [incrementerVolume, setIncrementerVolume] = useState(10)
 
   // Now import the functions from useBeatmapGenerator
-  const { isBeatmapGenerating, beatmapGenerationStatus, getDownloadableBeatmap } = useBeatmapGenerator()
+  const {
+    isBeatmapGenerating,
+    setIsBeatmapGenerating,
+    beatmapGenerationStatus,
+    setBeatmapGenerationStatus,
+    getDownloadableBeatmap
+  } = useBeatmapGenerator()
 
   // Then set up the function when the Create button is clicked
   const validateForm = async () => {
     // Check a beatmap is set
     if (!beatmap.setId) {
       setError('There is no beatmap set')
+
+      return
+    }
+
+    if (comboIncrement !== 'new' && isNaN(Number(comboIncrement))) {
+      setError('The combo increment must be a number or \'new\'')
 
       return
     }
@@ -232,20 +232,30 @@ export default function Form() {
     }
 
     // Awesome, now we're ready to create the difficulties
-    const { blob, filename } = await getDownloadableBeatmap(beatmap, diffSetParams, processedSets)
+    try {
+      const { blob, filename } = await getDownloadableBeatmap(beatmap, diffSetParams, processedSets)
 
-    // Now we've go the difficulties, we can create an invisible link to download it
-    const downloadElement = document.createElement('a')
-    downloadElement.style.display = 'none'
-    downloadElement.setAttribute('href', URL.createObjectURL(blob))
-    // TODO - Update this filename so it goes in the same folder as when you download from the osu website
-    downloadElement.setAttribute('download', filename)
+      // Now we've go the difficulties, we can create an invisible link to download it
+      const downloadElement = document.createElement('a')
+      downloadElement.style.display = 'none'
+      downloadElement.setAttribute('href', URL.createObjectURL(blob))
+      // TODO - Update this filename so it goes in the same folder as when you download from the osu website
+      downloadElement.setAttribute('download', filename)
 
-    // Add it to the child
-    document.body.appendChild(downloadElement)
+      // Add it to the child
+      document.body.appendChild(downloadElement)
 
-    // And click it
-    downloadElement.click()
+      // And click it
+      downloadElement.click()
+    } catch (e) {
+      // Reset the beatmap generation status strings
+      setIsBeatmapGenerating(false)
+      setBeatmapGenerationStatus('')
+
+      // And throw out an error
+      setError('An error occurred during generation.')
+      console.log(e)
+    }
   }
 
   return (
@@ -261,10 +271,10 @@ export default function Form() {
         <Line>
           Make me <Underline>{diffSets.length}</Underline> set{diffSets.length > 1 ? 's' : ''} of diffs every&nbsp;
           <BaseInput
-            inputMode="numeric"
+            // inputMode="numeric"
             defaultValue={comboIncrement}
             dynamicWidth={true}
-            pattern="^[0-9]{1,3}$"
+            // pattern="^[0-9]{1,3}$"
             onInputChange={setComboIncrement} /> combo:
         </Line>
         <DiffSetList beatmap={beatmap} onDiffsChange={setDiffSets} />

@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import styled from 'styled-components'
 
-import BaseInput from '../components/base/BaseInput'
+import BaseInput from './base/BaseInput'
+import Underline from './styles/Underline'
 
 const Container = styled.span`
   position: relative;
@@ -26,26 +27,17 @@ const Container = styled.span`
   }
 `
 
-const BeatmapName = styled.span`
+const BeatmapName = styled(Underline)`
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   overflow: hidden;
   pointer-events: none;
-  text-decoration: underline;
-  text-decoration-style: dashed;
-  text-decoration-color: rgb(var(--red));
-  text-decoration-thickness: 2px;
   text-overflow: ellipsis;
   text-underline-offset: 6px;
   transition: opacity 0.3s, transform 0.5s;
   white-space: nowrap;
-
-  @media screen and (max-width: 750px) {
-    text-decoration-thickness: 1px;
-    text-underline-offset: 5px;
-  }
 `
 
 export default function BeatmapSelector({ onBeatmapSelect }) {
