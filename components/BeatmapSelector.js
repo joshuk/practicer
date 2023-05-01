@@ -8,22 +8,22 @@ const Container = styled.span`
   position: relative;
   flex: 1;
 
-  input {
-    width: 100%;
-    transition: opacity 0.3s;
+  &[data-is-valid="true"] input {
+    opacity: 0;
 
-    :invalid {
+    :focus {
       opacity: 1;
-    }
-
-    :valid:not(:focus) {
-      opacity: 0;
     }
 
     :focus + span {
       opacity: 0;
       transform: translateY(-24px);
     }
+  }
+
+  input {
+    width: 100%;
+    transition: opacity 0.3s;
   }
 `
 
@@ -100,10 +100,9 @@ export default function BeatmapSelector({ onBeatmapSelect }) {
   }
 
   return (
-    <Container>
+    <Container data-is-valid={selectedBeatmap !== ''}>
       <BaseInput
         placeholder="https://osu.ppy.sh/beatmapsets/874#osu/6097"
-        pattern="https:\/\/osu\.ppy\.sh\/beatmapsets\/\d+#osu\/\d+"
         onInputChange={onBeatmapUpdate}/>
 
       <BeatmapName>{selectedBeatmap}</BeatmapName>
