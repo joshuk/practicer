@@ -8,7 +8,7 @@ const Container = styled.span`
   position: relative;
   flex: 1;
 
-  &[data-is-valid="true"] input {
+  &[data-is-valid='true'] input {
     opacity: 0;
 
     :focus {
@@ -45,9 +45,10 @@ const BeatmapName = styled(Underline)`
 export default function BeatmapSelector({ onBeatmapSelect }) {
   const [selectedBeatmap, setSelectedBeatmap] = useState('')
 
-  const onBeatmapUpdate = async (value) => {
+  const onBeatmapUpdate = async value => {
     // Gather information from the URL about the beatmap
-    const beatmapRegex = /https:\/\/osu\.ppy\.sh\/beatmapsets\/\d+#(osu|mania|fruits|taiko)\/(\d+)/g
+    const beatmapRegex =
+      /https:\/\/osu\.ppy\.sh\/beatmapsets\/\d+#(osu|mania|fruits|taiko)\/(\d+)/g
     const beatmapRegexResult = beatmapRegex.exec(value.toLowerCase())
 
     // If the URL isn't valid, don't do anything
@@ -69,33 +70,29 @@ export default function BeatmapSelector({ onBeatmapSelect }) {
     }
 
     // Now let's try to fetch the beatmap info from our mirror
-    const apiUrl = `https://api.chimu.moe/v1/map/${beatmapRegexResult[2]}`
+    const apiUrl = `https://catboy.best/api/v2/b/${beatmapRegexResult[2]}`
 
     try {
       const beatmapRequest = await fetch(apiUrl)
       const beatmapResult = await beatmapRequest.json()
 
-      let diffName = beatmapResult.OsuFile.replace('.osu', '')
-
-      // Now we want to capture the mapper name and strip it out
-      const artistRegex = /(\([^(]*\) )?\[.*\]$/g
-      const artistRegexResult = artistRegex.exec(diffName)
-
-      diffName = diffName.replace(artistRegexResult[1], '')
+      const songName = `${beatmapResult.set.artist} - ${beatmapResult.set.title}`
+      const diffName = `${songName} [${beatmapResult.version}]`
 
       // Then set it in state so it shows up in the component
       setSelectedBeatmap(diffName)
 
       // Then pass it up to the state in the form
+      // Groove Coverage - The End (Nightcore Remix) (winber1) [Normal].osu
       onBeatmapSelect({
-        osuFilename: beatmapResult.OsuFile,
-        beatmapId: beatmapResult.BeatmapId,
-        setId: beatmapResult.ParentSetId,
-        maxCombo: beatmapResult.MaxCombo,
-        ar: beatmapResult.AR
+        osuFilename: `${songName} (${beatmapResult.set.creator}) [${beatmapResult.version}].osu`,
+        beatmapId: beatmapResult.id,
+        setId: beatmapResult.set.id,
+        maxCombo: beatmapResult.max_combo,
+        ar: beatmapResult.ar,
       })
     } catch (e) {
-      alert('There was an error fetching this beatmap from Chimu.')
+      alert('There was an error fetching this beatmap from Catboy.')
       setSelectedBeatmap('')
       onBeatmapSelect({})
     }
@@ -105,7 +102,8 @@ export default function BeatmapSelector({ onBeatmapSelect }) {
     <Container data-is-valid={selectedBeatmap !== ''}>
       <BaseInput
         placeholder="https://osu.ppy.sh/beatmapsets/874#osu/6097"
-        onInputChange={onBeatmapUpdate}/>
+        onInputChange={onBeatmapUpdate}
+      />
 
       <BeatmapName>{selectedBeatmap}</BeatmapName>
     </Container>

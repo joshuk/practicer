@@ -7,18 +7,18 @@ export default function useBeatmapGenerator() {
   const [isBeatmapGenerating, setIsBeatmapGenerating] = useState(false)
   const [beatmapGenerationStatus, setBeatmapGenerationStatus] = useState('')
 
-  const getBeatmapFromApi = async (beatmap) => {
-    const oszRequest = await fetch(`https://api.chimu.moe/v1/download/${beatmap.setId}`)
+  const getBeatmapFromApi = async beatmap => {
+    const oszRequest = await fetch(`https://catboy.best/d/${beatmap.setId}`)
     const oszFile = await oszRequest.blob()
-    
+
     const beatmapFile = await JSZip.loadAsync(oszFile)
-    
+
     return beatmapFile
   }
 
   const getActiveTimingPointAtTime = (timingPoints, time) => {
     // Let's filter out all the timing points with a time lower than the one passed in
-    const pastTimingPoints = timingPoints.filter((point) => {
+    const pastTimingPoints = timingPoints.filter(point => {
       return point.time <= time
     })
 
@@ -33,7 +33,7 @@ export default function useBeatmapGenerator() {
     return pastTimingPoints[pastTimingPoints.length - 1]
   }
 
-  const getDifficultyObjectFromString = (difficulty) => {
+  const getDifficultyObjectFromString = difficulty => {
     // Start by capturing the header
     const header = difficulty.match(/osu file format v(\d*)/)
 
@@ -41,8 +41,8 @@ export default function useBeatmapGenerator() {
       // Set the header as the first value in the object
       header: {
         stringValue: header[0],
-        headerVersion: Number(header[1])
-      }
+        headerVersion: Number(header[1]),
+      },
     }
 
     // First we need to split everything up so we can use it
@@ -51,27 +51,32 @@ export default function useBeatmapGenerator() {
 
     while ((matches = regex.exec(difficulty)) !== null) {
       if (matches.index === regex.lastIndex) {
-          regex.lastIndex++
+        regex.lastIndex++
       }
 
       // matches will contain an array of things the regex has found
       // So we can format them a bit nicer in an object
       // Let's start by splitting up the lines (and removing the blank ones)
-      const lines = matches[2].split('\r\n').filter((line) => line !== '')
+      const lines = matches[2].split('\r\n').filter(line => line !== '')
 
-      if (matches[1].match(/\[(?:General|Editor|Metadata|Difficulty|Colours)\]/)) {
+      if (
+        matches[1].match(/\[(?:General|Editor|Metadata|Difficulty|Colours)\]/)
+      ) {
         // This section is formatted like key:value, so can format it into an object
         const object = {
           // Add the string value of this section to the object by default
-          stringValue: matches[2].trim()
+          stringValue: matches[2].trim(),
         }
 
         // Split the line up to get the key and value
-        lines.forEach((line) => {
+        lines.forEach(line => {
           const splitLine = line.split(':')
 
           // If the value is a number, then add it to the object as such
-          object[splitLine[0]] = splitLine[1] && !isNaN(Number(splitLine[1])) ? Number(splitLine[1]) : splitLine[1].trim()
+          object[splitLine[0]] =
+            splitLine[1] && !isNaN(Number(splitLine[1]))
+              ? Number(splitLine[1])
+              : splitLine[1].trim()
         })
 
         // Then format them into an object
@@ -96,7 +101,7 @@ export default function useBeatmapGenerator() {
                 sampleIndex,
                 volume,
                 isUninherited,
-                effects
+                effects,
               ] = splitLine
 
               // Now we need to do a bit of formatting so everything makes sense
@@ -105,7 +110,9 @@ export default function useBeatmapGenerator() {
               beatLength = Number(beatLength)
               beatsInMeasure = Number(beatsInMeasure)
               // On older .osu versions this may not be set, so just default it to true if so
-              isUninherited = isUninherited ? Boolean(Number(isUninherited)) : true
+              isUninherited = isUninherited
+                ? Boolean(Number(isUninherited))
+                : true
 
               // If the point isn't uninherited (so the beatLength is a multiplier) then we can ignore
               // anything that's postive. This happens from time to time and it just breaks stuff.
@@ -118,10 +125,14 @@ export default function useBeatmapGenerator() {
                 time,
                 // If this timing point is uninherited, let's take the beatLength from the previous one
                 // We can then store the SV multiplier in another key, so it's a bit easier to read
-                beatLength: isUninherited ? beatLength : output[index-1].beatLength,
+                beatLength: isUninherited
+                  ? beatLength
+                  : output[index - 1].beatLength,
                 // Any uninherited points will use a multiplier of 1 (100%), the rest will be converted
                 // from percentages by dividing by 100
-                svMultiplier: isUninherited ? 1 : 1 / Math.abs(beatLength / 100),
+                svMultiplier: isUninherited
+                  ? 1
+                  : 1 / Math.abs(beatLength / 100),
                 svPercentage: isUninherited ? 100 : beatLength,
                 beatsInMeasure,
                 sampleSet,
@@ -129,9 +140,9 @@ export default function useBeatmapGenerator() {
                 volume,
                 isUninherited,
                 effects,
-                stringValue: line
+                stringValue: line,
               })
-            break
+              break
             case '[HitObjects]':
               // So let's start by getting some basic information, since the first 4 things
               // are the same regardless of the object type
@@ -142,7 +153,9 @@ export default function useBeatmapGenerator() {
               // Now we get the objectType, that is stored as an integer but formatted as an
               // 8 bit binary number. So let's convert it, then figure out what type the object is.
               const objectTypeInt = Number(splitLine[3])
-              const objectTypeBinary = objectTypeInt.toString(2).padStart(8, '0')
+              const objectTypeBinary = objectTypeInt
+                .toString(2)
+                .padStart(8, '0')
 
               // Let's default the object type to a note
               let objectType = 'circle'
@@ -162,8 +175,12 @@ export default function useBeatmapGenerator() {
 
                 // From here we can calculate the duration of the slider
                 // To do that we'll first need to get the timing point
-                const currentTimingPoint = getActiveTimingPointAtTime(sections['[TimingPoints]'], time)
-                const sliderMultiplier = sections['[Difficulty]'].SliderMultiplier
+                const currentTimingPoint = getActiveTimingPointAtTime(
+                  sections['[TimingPoints]'],
+                  time
+                )
+                const sliderMultiplier =
+                  sections['[Difficulty]'].SliderMultiplier
                 let sliderTickRate = sections['[Difficulty]'].SliderTickRate
 
                 // Now let's get the number of repeats
@@ -180,11 +197,16 @@ export default function useBeatmapGenerator() {
                 // To calculate the duration of a slider, we can use this formula from the osu website
                 // length / (SliderMultiplier * 100 * SV) * beatLength
                 const sliderDuration = Math.abs(
-                  Number(length) / (sliderMultiplier * 100 * currentTimingPoint.svMultiplier) * currentTimingPoint.beatLength
+                  (Number(length) /
+                    (sliderMultiplier *
+                      100 *
+                      currentTimingPoint.svMultiplier)) *
+                    currentTimingPoint.beatLength
                 )
 
                 // So now let's figure out how often a slider tick should appear in a slider
-                const sliderTickLength = currentTimingPoint.beatLength / sliderTickRate
+                const sliderTickLength =
+                  currentTimingPoint.beatLength / sliderTickRate
 
                 // Now we've got the duration, we can use it to figure out the number of ticks in the slider
                 let sliderTicks = Math.floor(sliderDuration / sliderTickLength)
@@ -225,16 +247,16 @@ export default function useBeatmapGenerator() {
                 isNewCombo: objectTypeBinary[5] === '1' || index === 0,
                 startCombo,
                 endCombo,
-                stringValue: line
+                stringValue: line,
               })
-            break
+              break
             default:
               // I don't need to format anything else properly right now, so just add it to the output
               // with a stringValue so it can be rebuilt
               output.push({
-                stringValue: line
+                stringValue: line,
               })
-            break
+              break
           }
         })
 
@@ -242,14 +264,14 @@ export default function useBeatmapGenerator() {
         sections[matches[1]] = output
       }
     }
-    
+
     return sections
   }
 
-  const getNewComboCombos = (hitObjects) => {
+  const getNewComboCombos = hitObjects => {
     const combos = []
 
-    hitObjects.forEach((object) => {
+    hitObjects.forEach(object => {
       if (object.isNewCombo) {
         combos.push(object.startCombo)
       }
@@ -259,7 +281,7 @@ export default function useBeatmapGenerator() {
   }
 
   const getHitObjectsBetweenCombo = (hitObjects, startCombo, endCombo) => {
-    const newHitObjects = hitObjects.filter((object) => {
+    const newHitObjects = hitObjects.filter(object => {
       // We wanna fetch all objects that have a starting combo between the ones
       // specified. This means that if the endCombo falls inside a slider it'll
       // still be picked up.
@@ -269,7 +291,12 @@ export default function useBeatmapGenerator() {
     return newHitObjects
   }
 
-  const getComboIncrementerObjects = (incrementerType, incrementAmount, incrementVolume, firstHitObject) => {
+  const getComboIncrementerObjects = (
+    incrementerType,
+    incrementAmount,
+    incrementVolume,
+    firstHitObject
+  ) => {
     if (incrementAmount === 0) {
       return []
     }
@@ -283,9 +310,9 @@ export default function useBeatmapGenerator() {
         // We're gonna basically make x amount of 0 length spinners, which is really easy
         // Let's just make an array with incrementAmount values, then fill them all with the same thing
         output = Array(incrementAmount).fill({
-          stringValue: `256,192,${incrementerTime},44,0,${incrementerTime},${incrementerHitsounds}`
+          stringValue: `256,192,${incrementerTime},44,0,${incrementerTime},${incrementerHitsounds}`,
         })
-      break
+        break
       case 'a slider':
         // Destructure this to make it a bit cleaner
         const { xPos, yPos } = firstHitObject
@@ -293,10 +320,14 @@ export default function useBeatmapGenerator() {
         // We're gonna make a really fast reverse slider that repeats incrementAmount - 1 times
         // An example syntax is available below
         // 154,165,55844,6,0,L|206:165,199,3,0:0:0.1:0:
-        output = [{
-          stringValue: `${xPos},${yPos},${incrementerTime},6,0,L|${xPos + 50}:${yPos},${incrementAmount - 1},3,${incrementerHitsounds}`
-        }]
-      break
+        output = [
+          {
+            stringValue: `${xPos},${yPos},${incrementerTime},6,0,L|${
+              xPos + 50
+            }:${yPos},${incrementAmount - 1},3,${incrementerHitsounds}`,
+          },
+        ]
+        break
     }
 
     return output
@@ -341,9 +372,9 @@ export default function useBeatmapGenerator() {
           // Let's first figure out what exactly we're looping through (since we loop through something
           // different for the hit objects)
           const loopValues = header === '[HitObjects]' ? hitObjects : values
-        
+
           // We can just loop through and add each object's stringValue along with a newLine
-          loopValues.forEach((value) => {
+          loopValues.forEach(value => {
             difficulty += `${value.stringValue}\n`
           })
         }
@@ -354,12 +385,16 @@ export default function useBeatmapGenerator() {
     return difficulty
   }
 
-  const getFilenameFromString = (string) => {
+  const getFilenameFromString = string => {
     // Filenames don't allow certain special characters in them, so we're just gonna strip them out
     return string.replace(/[<>:"\/\\|?*]/g, '')
   }
 
-  const getDownloadableBeatmap = async (beatmap, { comboIncrement, incrementer, incrementerVolume }, diffSets) => {
+  const getDownloadableBeatmap = async (
+    beatmap,
+    { comboIncrement, incrementer, incrementerVolume },
+    diffSets
+  ) => {
     // Set the initial states for the UI
     setIsBeatmapGenerating(true)
 
@@ -384,8 +419,11 @@ export default function useBeatmapGenerator() {
     // We've fetched it, so update the state again
     setBeatmapGenerationStatus('Creating')
 
+    console.log(beatmapFile)
+
     // Then get the current difficulty from the osz file
-    const difficulty = beatmapFile.files[getFilenameFromString(beatmap.osuFilename)]
+    const difficulty =
+      beatmapFile.files[getFilenameFromString(beatmap.osuFilename)]
     const difficultyContents = await difficulty.async('string')
 
     // And parse it into an object
@@ -395,14 +433,16 @@ export default function useBeatmapGenerator() {
     const hitObjects = parsedDifficulty['[HitObjects]']
 
     // It should be noted here that even though we pass through the actual max combo in the
-    // beatmap object, we don't necessarily want to use that due to inaccuracies in our 
+    // beatmap object, we don't necessarily want to use that due to inaccuracies in our
     // combo calculation as we may end up missing objects at the end
     const parsedMaxCombo = hitObjects[hitObjects.length - 1].endCombo
 
     // Let's also figure out the original difficulty's AR. We can check the Difficulty
     // section of the file for the ApproachRate. If this isn't set (on older maps) we can grab
     // the OverallDifficulty instead
-    const originalAr = parsedDifficulty['[Difficulty]'].ApproachRate || parsedDifficulty['[Difficulty]'].OverallDifficulty
+    const originalAr =
+      parsedDifficulty['[Difficulty]'].ApproachRate ||
+      parsedDifficulty['[Difficulty]'].OverallDifficulty
 
     // And grab the difficulty name
     const originalDiffName = parsedDifficulty['[Metadata]'].Version
@@ -420,9 +460,11 @@ export default function useBeatmapGenerator() {
         comboSets = getNewComboCombos(hitObjects)
       } else {
         // We're genearing between sets of different combos
-        comboSets = [...Array(Math.ceil(parsedMaxCombo / comboIncrement))].map((value, index) => {
-          return Math.min(comboIncrement * index, parsedMaxCombo)
-        })
+        comboSets = [...Array(Math.ceil(parsedMaxCombo / comboIncrement))].map(
+          (value, index) => {
+            return Math.min(comboIncrement * index, parsedMaxCombo)
+          }
+        )
       }
 
       // From that, we've gonna loop through each combo increment until we get to the end
@@ -432,7 +474,8 @@ export default function useBeatmapGenerator() {
 
         const sectionStartCombo = comboSets[index]
         // If we're on the last item in the comboSets array, then use the max combo
-        let sectionEndCombo = index === comboSets.length - 1 ? parsedMaxCombo : comboSets[index + 1]
+        let sectionEndCombo =
+          index === comboSets.length - 1 ? parsedMaxCombo : comboSets[index + 1]
 
         // Then determine whether the end of the diff is at the end of the map
         if (set.until === 'end of the map') {
@@ -440,10 +483,19 @@ export default function useBeatmapGenerator() {
         }
 
         // Now we've got the combo restraints, we can get the hit objects between both of those
-        const sectionHitObjects = getHitObjectsBetweenCombo(hitObjects, sectionStartCombo, sectionEndCombo)
+        const sectionHitObjects = getHitObjectsBetweenCombo(
+          hitObjects,
+          sectionStartCombo,
+          sectionEndCombo
+        )
 
         // Now we can generate the incrementer objects
-        const incrementerObjects = getComboIncrementerObjects(incrementer, set.startingCombo, incrementerVolume, sectionHitObjects[0])
+        const incrementerObjects = getComboIncrementerObjects(
+          incrementer,
+          set.startingCombo,
+          incrementerVolume,
+          sectionHitObjects[0]
+        )
 
         // Variable ARs are only supported by osu file format versions > 12, but versions < 8 have
         // differences in the way that SV are treated. This means that for any maps less than v8, we
@@ -454,22 +506,32 @@ export default function useBeatmapGenerator() {
         } else if (parsedDifficulty.header.headerVersion < 13) {
           parsedDifficulty.header = {
             stringValue: 'osu file format v13',
-            headerVersion: 13
+            headerVersion: 13,
           }
         }
 
         // Right, now we've sorted that out we can get some things ready for creating the difficulty
         // Let's start off with the new diff name
-        const newDiffName = `${originalDiffName} (${sectionStartCombo}-${sectionEndCombo}) (${set.startingCombo}x) ${set.ar !== originalAr ? `(AR ${set.ar})` : ''}`
+        const newDiffName = `${originalDiffName} (${sectionStartCombo}-${sectionEndCombo}) (${
+          set.startingCombo
+        }x) ${set.ar !== originalAr ? `(AR ${set.ar})` : ''}`
         parsedDifficulty['[Metadata]'].Version = newDiffName
         parsedDifficulty['[Difficulty]'].ApproachRate = set.ar
 
         // Ok sick, now we've got all that we can recalculate the difficulty file
-        const newDifficultyFile = getDifficultyStringFromObject(parsedDifficulty, incrementerObjects.concat(sectionHitObjects))
+        const newDifficultyFile = getDifficultyStringFromObject(
+          parsedDifficulty,
+          incrementerObjects.concat(sectionHitObjects)
+        )
 
         // Right, now just to add it to the zip file
         // First off figure out the filename
-        const fileName = getFilenameFromString(beatmap.osuFilename.replace(/\[.*\]/, `[${newDiffName.replace(/[^\w]/g, '')}]`))
+        const fileName = getFilenameFromString(
+          beatmap.osuFilename.replace(
+            /\[.*\]/,
+            `[${newDiffName.replace(/[^\w]/g, '')}]`
+          )
+        )
 
         // Then chuck it in the file
         beatmapFile.file(fileName, newDifficultyFile)
@@ -477,10 +539,15 @@ export default function useBeatmapGenerator() {
     }
 
     // We've gone through the set, added the files, now we can just generate the beatmap file's blob
-    const blob = await beatmapFile.generateAsync({ type: 'blob', mimeType: 'application/x-osu-archive' })
+    const blob = await beatmapFile.generateAsync({
+      type: 'blob',
+      mimeType: 'application/x-osu-archive',
+    })
 
     // And the osz filename
-    const oszFilename = `Practicer - ${beatmap.setId} ${getFilenameFromString(beatmap.osuFilename.replace(/ (?:\([^(]*\) )?\[.*\].osu$/, ''))}.osz`
+    const oszFilename = `Practicer - ${beatmap.setId} ${getFilenameFromString(
+      beatmap.osuFilename.replace(/ (?:\([^(]*\) )?\[.*\].osu$/, '')
+    )}.osz`
 
     // Update the state
     setIsBeatmapGenerating(false)
@@ -489,7 +556,7 @@ export default function useBeatmapGenerator() {
     // And return the file
     return {
       blob,
-      filename: oszFilename
+      filename: oszFilename,
     }
   }
 
@@ -498,6 +565,6 @@ export default function useBeatmapGenerator() {
     setIsBeatmapGenerating,
     beatmapGenerationStatus,
     setBeatmapGenerationStatus,
-    getDownloadableBeatmap
+    getDownloadableBeatmap,
   }
 }
